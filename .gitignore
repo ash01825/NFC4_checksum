@@ -1,0 +1,38 @@
+# Node dependencies
+node_modules/
+
+# Hardhat artifacts and cache
+artifacts/
+cache/
+build-info/
+ignition/
+
+# TypeChain output (if using typechain plugin)
+typechain/
+typechain-types/
+
+# Coverage outputs
+coverage/
+coverage.json
+*.lcov
+
+# Deployment outputs (Hardhat Ignition local deployments)
+ignition/deployments/chain-31337/
+
+# Environment variables
+.env
+.env.*
+
+# IDE/editor settings
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Misc system files
+.DS_Store
+NFC4_checksum
+
+# Optional: Backend or build outputs (if applicable)
+backend/
