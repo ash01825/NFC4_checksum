@@ -1,79 +1,70 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// We need to import the other contracts to use them
 import "./IdentityRegistry.sol";
 import "./EscrowVault.sol";
 
 /**
  * @title TradeAgreement
- * @notice The main contract that manages the entire trade lifecycle.
- * @dev This is the core logic. It creates trades, links to an escrow vault,
- * checks identities, and tracks the state of the deal from start to finish.
+ * @notice Handles the lifecycle of a trade between verified participants using escrow.
  */
 contract TradeAgreement {
-    // --- Interfaces ---
-    // An interface tells this contract what functions are available on another contract.
-    // This is how we'll talk to the IdentityRegistry.
     IdentityRegistry public identityRegistry;
-
-    // --- State Variables ---
     uint256 public tradeCounter;
 
-    // An enum to define the possible states of a trade.
     enum TradeStatus {
-        Created, // Just initiated by the exporter
-        Funded, // Importer has deposited funds into escrow
-        InTransit, // Exporter has marked goods as shipped
-        Completed, // Importer has confirmed receipt, funds released
-        Cancelled // Deal cancelled
+        Created,
+        Funded,
+        InTransit,
+        Completed,
+        Cancelled
     }
 
-    // A struct to hold all the details for a single trade.
     struct Trade {
         uint256 id;
         address exporter;
         address importer;
-        uint256 value; // Price of the goods in wei
-        string description; // e.g., "1000 units of Organic Cotton"
-        string esgData; // e.g., "Certified Organic, Low Water Usage"
-        address escrowVault; // Address of the unique vault for this trade
+        uint256 value;
+        string description;
+        string esgData;
+        address escrowVault;
         TradeStatus status;
         string latestShipmentUpdate;
     }
 
-    // Mapping from a trade ID to its data struct.
     mapping(uint256 => Trade) public trades;
 
-    // --- Events ---
+    /// @notice Emitted when a new trade is created
     event TradeCreated(
         uint256 indexed tradeId,
         address indexed exporter,
         address indexed importer,
         uint256 value
     );
+
+    /// @notice Emitted when a trade is funded by the importer
     event TradeFunded(uint256 indexed tradeId);
+
+    /// @notice Emitted when shipment status is updated by the exporter
     event ShipmentUpdated(uint256 indexed tradeId, string newStatus);
+
+    /// @notice Emitted when trade is completed and funds are released
     event TradeCompleted(uint256 indexed tradeId);
 
-    // --- Constructor ---
     /**
-     * @notice Sets up the contract by linking it to the deployed IdentityRegistry.
-     * @param _registryAddress The address of the IdentityRegistry contract.
+     * @param _registryAddress Address of the deployed IdentityRegistry contract
      */
     constructor(address _registryAddress) {
-        require(_registryAddress != address(0), "Bad registry address");
+        require(_registryAddress != address(0), "Invalid registry address");
         identityRegistry = IdentityRegistry(_registryAddress);
     }
 
-    // --- Core Functions ---
-
     /**
-     * @notice Creates a new trade agreement. Called by the exporter.
-     * @param _importer The address of the importing party.
-     * @param _value The price of the goods in wei (the smallest unit of Ether).
-     * @param _description A description of the goods.
-     * @param _esgData Self-declared ESG metrics for the trade.
+     * @notice Initiates a new trade
+     * @param _importer Address of the importer
+     * @param _value Trade value in wei
+     * @param _description Description of goods
+     * @param _esgData ESG metrics string
      */
     function createTrade(
         address _importer,
@@ -81,91 +72,92 @@ contract TradeAgreement {
         string memory _description,
         string memory _esgData
     ) external {
-        // Check that both parties are registered in our identity system.
         require(identityRegistry.isVerified(msg.sender), "Exporter not verified");
         require(identityRegistry.isVerified(_importer), "Importer not verified");
-        require(_value > 0, "Value must be greater than zero");
+        require(_value > 0, "Invalid trade value");
 
         tradeCounter++;
-        uint256 currentTradeId = tradeCounter;
+        uint256 tradeId = tradeCounter;
 
-        // Create a NEW EscrowVault specifically for this trade.
-        // The vault is controlled by this TradeAgreement contract.
         EscrowVault newVault = new EscrowVault(
-            address(this), // This contract is the controller
-            msg.sender, // The exporter is the beneficiary
-            msg.sender // The exporter is the initial owner of the vault contract
+            address(this),
+            msg.sender,
+            msg.sender
         );
 
-        // Store the new trade's details.
-        trades[currentTradeId] = Trade({
-            id: currentTradeId,
+        trades[tradeId] = Trade({
+            id: tradeId,
             exporter: msg.sender,
             importer: _importer,
             value: _value,
             description: _description,
             esgData: _esgData,
-            escrowVault: address(newVault), // Store the new vault's address
+            escrowVault: address(newVault),
             status: TradeStatus.Created,
             latestShipmentUpdate: "Awaiting funding"
         });
 
-        emit TradeCreated(currentTradeId, msg.sender, _importer, _value);
+        emit TradeCreated(tradeId, msg.sender, _importer, _value);
     }
 
     /**
-     * @notice Funds a trade. Called by the importer.
-     * @param _tradeId The ID of the trade to fund.
+     * @notice Allows importer to fund the trade
+     * @param _tradeId Trade ID
      */
     function fundTrade(uint256 _tradeId) external payable {
-        Trade storage currentTrade = trades[_tradeId];
+        Trade storage trade = trades[_tradeId];
 
-        // Security checks
-        require(currentTrade.id != 0, "Trade does not exist");
-        require(msg.sender == currentTrade.importer, "Not the importer");
-        require(currentTrade.status == TradeStatus.Created, "Trade not ready for funding");
-        require(msg.value == currentTrade.value, "Incorrect payment amount");
+        require(trade.id != 0, "Trade not found");
+        require(msg.sender == trade.importer, "Unauthorized");
+        require(trade.status == TradeStatus.Created, "Invalid state");
+        require(msg.value == trade.value, "Incorrect amount");
 
-        // Forward the payment to the escrow vault.
-        (bool success, ) = currentTrade.escrowVault.call{value: msg.value}("");
-        require(success, "Funding transfer failed");
+        (bool success, ) = trade.escrowVault.call{value: msg.value}("");
+        require(success, "Transfer to vault failed");
 
-        // Update state
-        currentTrade.status = TradeStatus.Funded;
-        currentTrade.latestShipmentUpdate = "Awaiting shipment";
+        trade.status = TradeStatus.Funded;
+        trade.latestShipmentUpdate = "Awaiting shipment";
+
         emit TradeFunded(_tradeId);
     }
 
     /**
-     * @notice Updates the shipment status. Called by the exporter.
-     * @param _tradeId The ID of the trade.
-     * @param _newStatus A string describing the new status, e.g., "In Transit".
+     * @notice Allows exporter to update shipment status
+     * @param _tradeId Trade ID
+     * @param _newStatus New shipment status string
      */
     function updateShipmentStatus(uint256 _tradeId, string memory _newStatus) external {
-        Trade storage currentTrade = trades[_tradeId];
-        require(msg.sender == currentTrade.exporter, "Not the exporter");
-        require(currentTrade.status == TradeStatus.Funded || currentTrade.status == TradeStatus.InTransit, "Trade not in a valid state for update");
+        Trade storage trade = trades[_tradeId];
 
-        currentTrade.status = TradeStatus.InTransit;
-        currentTrade.latestShipmentUpdate = _newStatus;
+        require(msg.sender == trade.exporter, "Unauthorized");
+        require(
+            trade.status == TradeStatus.Funded || trade.status == TradeStatus.InTransit,
+            "Invalid state"
+        );
+
+        trade.status = TradeStatus.InTransit;
+        trade.latestShipmentUpdate = _newStatus;
+
         emit ShipmentUpdated(_tradeId, _newStatus);
     }
 
     /**
-     * @notice Confirms receipt of goods. Called by the importer. This triggers the payout.
-     * @param _tradeId The ID of the trade to complete.
+     * @notice Allows importer to confirm receipt and trigger fund release
+     * @param _tradeId Trade ID
      */
     function confirmReceipt(uint256 _tradeId) external {
-        Trade storage currentTrade = trades[_tradeId];
-        require(msg.sender == currentTrade.importer, "Not the importer");
-        require(currentTrade.status == TradeStatus.InTransit || currentTrade.status == TradeStatus.Funded, "Trade not in transit or funded");
+        Trade storage trade = trades[_tradeId];
 
-        // Tell the EscrowVault to release the funds.
-        // We must explicitly cast the address to 'payable' before casting to the contract type.
-        EscrowVault(payable(currentTrade.escrowVault)).withdraw();
+        require(msg.sender == trade.importer, "Unauthorized");
+        require(
+            trade.status == TradeStatus.Funded || trade.status == TradeStatus.InTransit,
+            "Invalid state"
+        );
 
-        // Update state
-        currentTrade.status = TradeStatus.Completed;
+        EscrowVault(payable(trade.escrowVault)).withdraw();
+
+        trade.status = TradeStatus.Completed;
+
         emit TradeCompleted(_tradeId);
     }
 }

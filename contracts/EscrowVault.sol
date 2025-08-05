@@ -5,9 +5,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title EscrowVault
- * @notice Holds funds for a trade deal. Gets told what to do by the main agreement contract.
- * @dev Simple lockbox. It gets a payment, holds it, and only sends it to the
- * beneficiary when the main contract calls the withdraw function.
+ * @notice Simple vault to hold funds for a trade. Controlled by TradeAgreement.
+ * @dev ETH is held until explicitly released to the exporter by the main contract.
  */
 contract EscrowVault is Ownable {
     // --- Events ---
@@ -15,32 +14,20 @@ contract EscrowVault is Ownable {
     event Withdrawn(address indexed to, uint256 amount);
 
     // --- State ---
-
-    // Address of the TradeAgreement that's in charge here.
-    // immutable = set once, never changes. Cheaper and safer.
-    address public immutable tradeContractAddr;
-
-    // Who gets the money at the end. (The Exporter)
-    address public payoutAddr;
+    address public immutable tradeContractAddr; // Authorized controller (TradeAgreement)
+    address public payoutAddr;                  // Recipient (exporter)
 
     // --- Modifiers ---
-
-    // A check to make sure only our TradeAgreement contract can tell this vault what to do.
     modifier onlyTradeContract() {
-        require(
-            msg.sender == tradeContractAddr,
-            "Caller is not the trade contract"
-        );
-        _; // If check passes, run the rest of the function.
+        require(msg.sender == tradeContractAddr, "Caller is not the trade contract");
+        _;
     }
 
-    // --- Functions ---
-
     /**
-     * @notice Sets up the vault for one specific trade.
-     * @param _tradeContractAddr The address of the contract that will control this one.
-     * @param _payoutAddr The address of the person who gets paid.
-     * @param _ownerAddr The deployer's address.
+     * @notice Initializes the vault for a single trade.
+     * @param _tradeContractAddr The authorized contract (TradeAgreement).
+     * @param _payoutAddr Final recipient of the funds (exporter).
+     * @param _ownerAddr Owner (used for OpenZeppelin Ownable setup).
      */
     constructor(
         address _tradeContractAddr,
@@ -55,21 +42,20 @@ contract EscrowVault is Ownable {
     }
 
     /**
-     * @notice Simple getter to see how much money is locked up.
+     * @notice Returns the vault’s current balance.
      */
     function getBalance() public view returns (uint256) {
         return address(this).balance;
     }
 
     /**
-     * @notice Releases the entire balance to the beneficiary.
-     * @dev The main payout function. Protected by the onlyTradeContract modifier.
+     * @notice Transfers all funds to the exporter.
+     * @dev Callable only by the authorized trade contract.
      */
     function withdraw() external onlyTradeContract {
         uint256 balance = address(this).balance;
         require(balance > 0, "Vault is empty");
 
-        // Use the secure .call method to send the ETH.
         (bool success, ) = payable(payoutAddr).call{value: balance}("");
         require(success, "ETH transfer failed");
 
@@ -77,8 +63,7 @@ contract EscrowVault is Ownable {
     }
 
     /**
-     * @notice This special 'receive' function lets the contract accept ETH payments.
-     * When the importer sends funds to this contract, this function catches them.
+     * @notice Accepts ETH deposits.
      */
     receive() external payable {
         emit Deposited(msg.sender, msg.value);
