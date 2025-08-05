@@ -1,37 +1,58 @@
-# Node dependencies
+# ----------------------------
+# Node.js & Express backend
+# ----------------------------
 node_modules/
+.env
+.env.local
+dist/
+build/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
 
-# Hardhat artifacts and cache
+# ----------------------------
+# Python (AI Agent)
+# ----------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+env/
+venv/
+Pipfile.lock
+
+# ----------------------------
+# Hardhat (Smart Contracts)
+# ----------------------------
 artifacts/
 cache/
-build-info/
-ignition/
-
-# TypeChain output (if using typechain plugin)
+deployments/
+ignition/deployments/
 typechain/
 typechain-types/
-
-# Coverage outputs
 coverage/
-coverage.json
-*.lcov
+gas-report.txt
 
-# Deployment outputs (Hardhat Ignition local deployments)
-ignition/deployments/chain-31337/
-
-# Environment variables
-.env
-.env.*
-
-# IDE/editor settings
-.idea/
-.vscode/
-
-# Logs
-*.log
-
-# Misc system files
+# ----------------------------
+# OS + Editor/IDE Files
+# ----------------------------
 .DS_Store
-NFC4_checksum
+.vscode/
+.idea/
+*.swp
 
-# Optional: Backend or build outputs (if applicable)
+# ----------------------------
+# Git
+# ----------------------------
+.git/
+*.log
+*.tgz
+*.bak
+
+# ----------------------------
+# Flask (Python AI Server)
+# ----------------------------
+instance/
+*.sqlite3
+flask_session/

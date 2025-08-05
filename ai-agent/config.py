@@ -3,44 +3,51 @@ import json
 from dotenv import load_dotenv
 from web3 import Web3
 
-# --- Load environment variables ---
+# Load all environment variables from the .env file
 load_dotenv()
 
 # --- Blockchain Configuration ---
 RPC_URL = os.getenv("BASE_SEPOLIA_RPC_URL")
 CONTRACT_ADDRESS = os.getenv("TRADE_AGREEMENT_CONTRACT_ADDRESS")
-
 if not RPC_URL:
-    raise ValueError("❌ BASE_SEPOLIA_RPC_URL is not set in .env")
+    raise ValueError("RPC URL not set!")
 
-if not CONTRACT_ADDRESS:
-    raise ValueError("❌ TRADE_AGREEMENT_CONTRACT_ADDRESS is not set in .env")
+if not CONTRACT_ADDRESS or CONTRACT_ADDRESS == "YOUR_DEPLOYED_TRADEAGREEMENT_ADDRESS":
+    print("⚠️ WARNING: No valid TradeAgreement contract address set. Using dummy address for testing.")
+    CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000"  # dummy zero address
 
 # --- AI Configuration ---
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    raise ValueError("❌ OPENAI_API_KEY is not set in .env")
+# Switched from OpenAI to Google
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY not set!")
 
 # --- Web3 Setup ---
 try:
     W3 = Web3(Web3.HTTPProvider(RPC_URL))
     if not W3.is_connected():
-        raise ConnectionError("❌ Web3 failed to connect to RPC URL")
+        raise ConnectionError("Failed to connect to blockchain via RPC_URL")
 
-    # Load ABI from artifacts folder (ensure the path is correct)
-    ABI_PATH = "../artifacts/contracts/TradeAgreement.sol/TradeAgreement.json"
-    with open(ABI_PATH, "r") as f:
-        contract_artifact = json.load(f)
+    # Load the contract ABI from the artifact file
+    # Make sure the path is correct relative to where you run the script
+    with open("../artifacts/contracts/TradeAgreement.sol/TradeAgreement.json") as f:
+        info_json = json.load(f)
+    ABI = info_json["abi"]
 
-    ABI = contract_artifact.get("abi")
-    if not ABI:
-        raise ValueError("❌ ABI not found in artifact JSON")
-
-    # Instantiate contract
-    TRADE_CONTRACT = W3.eth.contract(address=CONTRACT_ADDRESS, abi=ABI)
-    print("✅ Blockchain connected and contract instance loaded.")
+    # Create a contract instance
+    try:
+        if CONTRACT_ADDRESS == "0x0000000000000000000000000000000000000000":
+            TRADE_CONTRACT = None
+        else:
+            TRADE_CONTRACT = W3.eth.contract(address=CONTRACT_ADDRESS, abi=ABI)
+    except Exception as e:
+        print(f"⚠️ Contract instantiation skipped due to invalid address: {e}")
+        TRADE_CONTRACT = None
+    print("✅ Configuration loaded and connected to blockchain.")
 
 except FileNotFoundError:
-    raise FileNotFoundError(f"❌ Artifact file not found at {ABI_PATH}. Run `npx hardhat compile`.")
+    print("❌ ERROR: Contract artifact not found. Make sure you have compiled your contracts.")
+    raise
 except Exception as e:
-    raise RuntimeError(f"❌ Failed during Web3 or contract setup: {str(e)}")
+    print(f"❌ ERROR in configuration: {e}")
+    raise

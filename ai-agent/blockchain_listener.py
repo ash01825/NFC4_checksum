@@ -12,6 +12,9 @@ def handle_event(event):
 
     try:
         # Fetch full trade details from the smart contract
+        if not TRADE_CONTRACT:
+            print("⚠️ Skipping blockchain call, contract not available.")
+            return
         trade_details = TRADE_CONTRACT.functions.trades(trade_id).call()
 
         trade_data = {
@@ -41,6 +44,9 @@ def listen_for_events():
     print(f"   Watching TradeCreated events on: {TRADE_CONTRACT.address}\n")
 
     try:
+        if not TRADE_CONTRACT:
+            print("⚠️ Skipping blockchain call, contract not available.")
+            return
         event_filter = TRADE_CONTRACT.events.TradeCreated.create_filter(fromBlock='latest')
     except Exception as e:
         print(f"❌ Failed to create event filter: {e}")
