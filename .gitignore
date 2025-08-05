@@ -35,4 +35,3 @@ ignition/deployments/chain-31337/
 NFC4_checksum
 
 # Optional: Backend or build outputs (if applicable)
-backend/
