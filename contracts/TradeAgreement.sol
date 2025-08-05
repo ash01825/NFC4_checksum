@@ -9,20 +9,24 @@ import "./EscrowVault.sol";
  * @title TradeAgreement
  * @notice The main contract that manages the entire trade lifecycle.
  * @dev This is the core logic. It creates trades, links to an escrow vault,
+ * checks identities, and tracks the state of the deal from start to finish.
  */
 contract TradeAgreement {
-
+    // --- Interfaces ---
+    // An interface tells this contract what functions are available on another contract.
+    // This is how we'll talk to the IdentityRegistry.
     IdentityRegistry public identityRegistry;
 
+    // --- State Variables ---
     uint256 public tradeCounter;
 
     // An enum to define the possible states of a trade.
     enum TradeStatus {
-        Created,
-        Funded,
-        InTransit,
-        Completed,
-        Cancelled
+        Created, // Just initiated by the exporter
+        Funded, // Importer has deposited funds into escrow
+        InTransit, // Exporter has marked goods as shipped
+        Completed, // Importer has confirmed receipt, funds released
+        Cancelled // Deal cancelled
     }
 
     // A struct to hold all the details for a single trade.
@@ -31,13 +35,14 @@ contract TradeAgreement {
         address exporter;
         address importer;
         uint256 value; // Price of the goods in wei
-        string description;
-        string esgData;
-        address escrowVault;
+        string description; // e.g., "1000 units of Organic Cotton"
+        string esgData; // e.g., "Certified Organic, Low Water Usage"
+        address escrowVault; // Address of the unique vault for this trade
         TradeStatus status;
         string latestShipmentUpdate;
     }
 
+    // Mapping from a trade ID to its data struct.
     mapping(uint256 => Trade) public trades;
 
     // --- Events ---
@@ -84,6 +89,8 @@ contract TradeAgreement {
         tradeCounter++;
         uint256 currentTradeId = tradeCounter;
 
+        // Create a NEW EscrowVault specifically for this trade.
+        // The vault is controlled by this TradeAgreement contract.
         EscrowVault newVault = new EscrowVault(
             address(this), // This contract is the controller
             msg.sender, // The exporter is the beneficiary
@@ -153,8 +160,11 @@ contract TradeAgreement {
         require(msg.sender == currentTrade.importer, "Not the importer");
         require(currentTrade.status == TradeStatus.InTransit || currentTrade.status == TradeStatus.Funded, "Trade not in transit or funded");
 
+        // Tell the EscrowVault to release the funds.
+        // We must explicitly cast the address to 'payable' before casting to the contract type.
         EscrowVault(payable(currentTrade.escrowVault)).withdraw();
 
+        // Update state
         currentTrade.status = TradeStatus.Completed;
         emit TradeCompleted(_tradeId);
     }

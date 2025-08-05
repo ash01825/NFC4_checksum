@@ -16,8 +16,10 @@ contract IdentityRegistry is Ownable {
         string name
     );
 
+    // Event for a change in verification status
     event ParticipantVerified(address indexed participantAddr, bool isVerified);
 
+    // Holds data for each registered entity
     struct Participant {
         string name; // e.g., "Surat Silks"
         string role; // e.g., "Exporter", "Importer"
@@ -28,6 +30,7 @@ contract IdentityRegistry is Ownable {
     // Main lookup: address -> Participant data
     mapping(address => Participant) public participants;
 
+    // Sets the initial owner upon deployment
     constructor(address initialOwner) Ownable(initialOwner) {}
 
     /**
@@ -57,6 +60,7 @@ contract IdentityRegistry is Ownable {
             registrationDate: block.timestamp
         });
 
+        // Announce the registration
         emit ParticipantRegistered(_addr, _role, _name);
         emit ParticipantVerified(_addr, true);
     }

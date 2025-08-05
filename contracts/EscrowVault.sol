@@ -14,16 +14,24 @@ contract EscrowVault is Ownable {
     event Deposited(address indexed from, uint256 amount);
     event Withdrawn(address indexed to, uint256 amount);
 
+    // --- State ---
+
+    // Address of the TradeAgreement that's in charge here.
+    // immutable = set once, never changes. Cheaper and safer.
     address public immutable tradeContractAddr;
 
+    // Who gets the money at the end. (The Exporter)
     address public payoutAddr;
 
+    // --- Modifiers ---
+
+    // A check to make sure only our TradeAgreement contract can tell this vault what to do.
     modifier onlyTradeContract() {
         require(
             msg.sender == tradeContractAddr,
             "Caller is not the trade contract"
         );
-        _;
+        _; // If check passes, run the rest of the function.
     }
 
     // --- Functions ---
@@ -69,7 +77,8 @@ contract EscrowVault is Ownable {
     }
 
     /**
-     * @notice
+     * @notice This special 'receive' function lets the contract accept ETH payments.
+     * When the importer sends funds to this contract, this function catches them.
      */
     receive() external payable {
         emit Deposited(msg.sender, msg.value);
