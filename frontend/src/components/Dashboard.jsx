@@ -3,6 +3,8 @@ import { useAccount, useBalance } from 'wagmi';
 import { ethers } from 'ethers';
 import { Link } from 'react-router-dom';
 import { CONTRACT_ADDRESSES, CONTRACT_ABIS, TRADE_STATUS } from '../config/contracts';
+import UserRegistration from './UserRegistration';
+import AdminPanel from './AdminPanel';
 
 const Dashboard = () => {
   const { address, isConnected } = useAccount();
@@ -34,11 +36,21 @@ const Dashboard = () => {
       setIsVerified(verified);
 
       if (verified) {
-        const role = await identityRegistry.getRole(address);
-        setUserRole(role);
+        try {
+          const role = await identityRegistry.getRole(address);
+          setUserRole(role);
+        } catch (error) {
+          console.error('Error getting user role:', error);
+          setUserRole('');
+        }
+      } else {
+        // User is not registered, show registration option
+        setUserRole('');
       }
     } catch (error) {
       console.error('Error loading user data:', error);
+      setIsVerified(false);
+      setUserRole('');
     }
   };
 
@@ -112,8 +124,21 @@ const Dashboard = () => {
     );
   }
 
+  const handleRegistrationComplete = () => {
+    // Reload user data after registration
+    loadUserData();
+  };
+
   return (
     <div className="space-y-6">
+      {/* Admin Panel - Shows if user is contract owner */}
+      {isConnected && <AdminPanel />}
+
+      {/* Registration Component - Show if user is not verified */}
+      {isConnected && !isVerified && (
+        <UserRegistration onRegistrationComplete={handleRegistrationComplete} />
+      )}
+
       {/* Wallet Info */}
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Wallet Information</h2>

@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "setup-frontend": "npx hardhat run scripts/setup-frontend.js --network localhost",
+    "deploy": "npx hardhat run deploy/01-deploy-trade-contracts.js --network localhost"
   },
   "repository": {
     "type": "git",
